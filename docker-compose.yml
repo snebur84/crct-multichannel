@@ -1,0 +1,65 @@
+services:
+  pbx-db:
+    image: postgres:15
+    container_name: pbx-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pbx_db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - pbx-net
+
+  pbx-api:
+    build: ./backend
+    container_name: pbx-api
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@pbx-db:5432/${DB_NAME}
+    depends_on:
+      - pbx-db
+    ports:
+      - "8000:8000"
+    networks:
+      - pbx-net
+    volumes:
+      - asterisk_sounds:/var/lib/asterisk/sounds
+
+  pbx-core:
+    build: ./asterisk
+    container_name: pbx-core
+    restart: always
+    privileged: true
+    network_mode: "host" # Mantido por necessidade do SIP/RTP
+    environment:
+      - PABX_DOMAIN=${EXTERNAL_URL}
+      - LOCAL_NETWORK=${LOCAL_NETWORK}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_HOST=127.0.0.1
+    depends_on:
+      - pbx-db
+    volumes:
+      - ./asterisk/entrypoint.sh:/entrypoint.sh
+      - asterisk_keys:/etc/asterisk/keys
+      - asterisk_sounds:/var/lib/asterisk/sounds
+      - /etc/localtime:/etc/localtime:ro
+
+networks:
+  pbx-net:
+    driver: bridge
+
+volumes:
+  asterisk_keys:
+  pbx_db_data:
+  asterisk_sounds:

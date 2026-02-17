@@ -1,0 +1,4 @@
+venv
+*copy*
+.env
+asterisk/asterisk_assets/sounds_pt/pt-br.tar.gz
